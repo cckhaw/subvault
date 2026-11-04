@@ -9,9 +9,12 @@ import { SUBVAULT_CONFIG } from "../../plasmo.config";
 import { addSubscription, db, getVaultSummary, recordVisit } from "../db";
 import { baseDomain, formatCurrency, hostFromUrl } from "../lib/utils";
 import { registerCheckoutInterceptor } from "./checkout-interceptor";
+import { claimPending, clearPendingOnTabClose, setPending } from "./pending-signup";
 
 const MSG_SAVE_TRIAL = "SUBVAULT_SAVE_TRIAL";
 const MSG_REFRESH = "SUBVAULT_REFRESH";
+const MSG_PENDING_SET = "SUBVAULT_PENDING_SET";
+const MSG_PENDING_CLAIM = "SUBVAULT_PENDING_CLAIM";
 
 const ALARM_IDLE_SCAN = "subvault-idle-scan";
 const ORANGE = "#FF9500";
@@ -80,6 +83,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 registerCheckoutInterceptor();
+clearPendingOnTabClose();
 ensureAlarm();
 void updateBadge();
 
@@ -89,6 +93,7 @@ interface SaveTrialPayload {
   name: string;
   domain: string;
   cost: number;
+  billingCycle?: "monthly" | "yearly";
   /** `YYYY-MM-DD` */
   endDate: string;
 }
@@ -105,6 +110,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // async response
   }
 
+  const tabId = sender.tab?.id;
+  if (message?.type === MSG_PENDING_SET && tabId !== undefined) {
+    const { domain, name, days, price, cycle } = message.payload ?? {};
+    setPending(tabId, {
+      domain: typeof domain === "string" ? domain : "",
+      name: typeof name === "string" ? name.slice(0, 80) : "",
+      days: typeof days === "number" ? days : undefined,
+      price: typeof price === "number" ? price : undefined,
+      cycle: cycle === "yearly" ? "yearly" : cycle === "monthly" ? "monthly" : undefined
+    })
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
+  if (message?.type === MSG_PENDING_CLAIM && tabId !== undefined) {
+    claimPending(tabId)
+      .then((pending) => sendResponse({ ok: true, pending }))
+      .catch(() => sendResponse({ ok: false, pending: null }));
+    return true;
+  }
+
   if (message?.type === MSG_REFRESH) {
     updateBadge().then(() => sendResponse({ ok: true }));
     return true;
@@ -118,6 +145,7 @@ async function saveTrial(p: SaveTrialPayload) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(p.endDate)) throw new Error("Invalid trial end date");
   const domain = p.domain ? baseDomain(p.domain) : "";
   const cost = Number.isFinite(p.cost) && p.cost > 0 ? p.cost : 0;
+  const cycle = p.billingCycle === "yearly" ? "yearly" : "monthly";
 
   // Re-signing up for the same service moves the existing trial instead of duplicating it.
   if (domain) {
@@ -126,7 +154,8 @@ async function saveTrial(p: SaveTrialPayload) {
       await db.subscriptions.update(existing.id, {
         trialEndDate: p.endDate,
         renewalDate: p.endDate,
-        cost: cost || existing.cost
+        cost: cost || existing.cost,
+        billingCycle: cost ? cycle : existing.billingCycle
       });
       await updateBadge();
       return (await db.subscriptions.get(existing.id))!;
@@ -137,7 +166,7 @@ async function saveTrial(p: SaveTrialPayload) {
     name,
     domain,
     cost,
-    billingCycle: "monthly",
+    billingCycle: cycle,
     renewalDate: p.endDate,
     isTrial: true,
     trialEndDate: p.endDate
