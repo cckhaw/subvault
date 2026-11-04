@@ -1,0 +1,65 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [chrome-mv3, edge-mv3, safari-mv3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        if: matrix.target == 'chrome-mv3'
+        run: npm run typecheck
+
+      - name: Build and package (${{ matrix.target }})
+        run: |
+          npx plasmo build --target=${{ matrix.target }}
+          npx plasmo package --target=${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: subvault-${{ matrix.target }}
+          path: build/${{ matrix.target }}-prod.zip
+          if-no-files-found: error
+
+  release:
+    # Attach the zips to a GitHub release when a version tag (v1.2.3) is pushed.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/*.zip --repo "${GITHUB_REPOSITORY}" --generate-notes
