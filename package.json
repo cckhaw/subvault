@@ -1,0 +1,49 @@
+{
+  "name": "subvault",
+  "displayName": "SubVault",
+  "version": "1.0.0",
+  "description": "Local-first free-trial and subscription safeguard. Detects trial signups, flags idle \"Ghost SaaS\", deep-links cancellations and exports .ics reminders. No bank access, no servers.",
+  "author": "SubVault",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "build:edge": "plasmo build --target=edge-mv3",
+    "build:safari": "plasmo build --target=safari-mv3",
+    "package": "plasmo package",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dexie": "^4.0.11",
+    "dexie-react-hooks": "^1.1.7",
+    "ics": "^3.8.1",
+    "lucide-react": "^0.468.0",
+    "plasmo": "0.90.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@plasmohq/prettier-plugin-sort-imports": "4.0.1",
+    "@types/chrome": "0.0.258",
+    "@types/node": "20.11.5",
+    "@types/react": "18.2.48",
+    "@types/react-dom": "18.2.18",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "prettier": "3.2.4",
+    "tailwindcss": "^3.4.17",
+    "typescript": "5.3.3"
+  },
+  "manifest": {
+    "host_permissions": [
+      "<all_urls>"
+    ],
+    "permissions": [
+      "storage",
+      "tabs",
+      "alarms",
+      "webNavigation"
+    ]
+  }
+}
