@@ -3,6 +3,8 @@
 Local-first free-trial and subscription safeguard for Chrome, Edge and Safari (Plasmo, Manifest V3, React 18, TypeScript, Tailwind, Dexie).
 
 * **Checkout sheet** – on `/checkout`, `/subscribe`, `/signup`, `/billing`, `/trial` pages and `stripe.com`, `chargebee.com`, `paddle.com`, a floating Apple-HIG sheet offers 7-day / 14-day / custom trial reminders, saves the trial to IndexedDB and downloads a `Cancel_<Service>_Trial.ics` file.
+  * *Page text detection:* reads trial length and the post-trial price from the page text ("14-day free trial, then $19.99/month") and pre-fills them. It only reads visible text, never form fields.
+  * *Submit detection:* on signup/checkout pages (or pages that mention a trial) it waits until you submit the form or press a signup/pay button. If the page navigates away, the background worker carries the details to the next page (`chrome.storage.session`, 3 minute TTL).
 * **Ghost SaaS monitor** – services you track with no visit for 30+ days get an orange toolbar badge and a "wasted per month" figure.
 * **Cancellation deep links** – 140+ services in `src/db/cancellation-db.ts`.
 * **Private** – no bank access, no network calls, no account. Visit times are recorded only for sites of subscriptions you added.
